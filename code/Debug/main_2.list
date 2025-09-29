@@ -691,6 +691,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
  80004e6:	2110      	movs	r1, #16
  80004e8:	481e      	ldr	r0, [pc, #120]	; (8000564 <HAL_TIM_PeriodElapsedCallback+0xe4>)
  80004ea:	f000 fbfb 	bl	8000ce4 <HAL_GPIO_TogglePin>
+
 			  // đổi giá trị led_buffer sau mỗi giây
 			  // ví dụ: nhảy số tăng dần
 			  led_buffer[3]++;

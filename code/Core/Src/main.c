@@ -303,6 +303,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		if (counter_1s >= 100) {  // 100 x 10ms = 1000ms
 			  counter_1s = 0;
 			  HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
+
 			  // đổi giá trị led_buffer sau mỗi giây
 			  // ví dụ: nhảy số tăng dần
 			  led_buffer[3]++;
