@@ -58,7 +58,8 @@ void update7SEG(int index);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int counter_1s = 0;  // đếm thời gian 1 giây
+int counter_1s = 0;  	 // đếm thời gian 1 giây
+int scan_counter = 0;    // đếm số lần ngắt cho quét LED
 
 
 uint32_t segmentMap[10][7] = {
@@ -289,15 +290,19 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM2) {   // chỉ xử lý khi ngắt từ TIM2
-	  update7SEG(index_led);
-	  index_led++;
-	  if (index_led >= MAX_LED) index_led = 0;
-
-	  // Đếm 1 giây
-	          counter_1s++;
-		  if (counter_1s >= 100) {  // 100 x 10ms = 1000ms
+		scan_counter++;
+		counter_1s++;
+		// Quét LED mỗi 250ms
+		if (scan_counter >= 25) {   // 25 x 10ms = 250ms
+			scan_counter = 0;
+			update7SEG(index_led);
+			index_led++;
+			if (index_led >= MAX_LED) index_led = 0;
+		}
+		// Đếm 1 giây
+		if (counter_1s >= 100) {  // 100 x 10ms = 1000ms
 			  counter_1s = 0;
-
+			  HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
 			  // đổi giá trị led_buffer sau mỗi giây
 			  // ví dụ: nhảy số tăng dần
 			  led_buffer[3]++;
@@ -316,7 +321,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			  if (led_buffer[0] > 9) {
 				  led_buffer[0] = 0;
 			  }
-		}
+		  }
 	}
 }
 /* USER CODE END 4 */
