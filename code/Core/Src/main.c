@@ -27,7 +27,12 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum {
+    STATE_0 = 0,
+    STATE_1,
+    STATE_2,
+    STATE_3
+} DisplayState;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -53,36 +58,76 @@ static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void display7SEG(int num);
+void updateDisplay(DisplayState state);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-  int currLed = 0;
-  int counter = 50;
 
-  uint32_t segmentMap[10][7] = {
-  	// a,b,c,d,e,f,g
-  	{0,0,0,0,0,0,1}, // 0
-  	{1,0,0,1,1,1,1}, // 1
-  	{0,0,1,0,0,1,0}, // 2
-  	{0,0,0,0,1,1,0}, // 3
-  	{1,0,0,1,1,0,0}, // 4
-  	{0,1,0,0,1,0,0}, // 5
-  	{0,1,0,0,0,0,0}, // 6
-  	{0,0,0,1,1,1,1}, // 7
-  	{0,0,0,0,0,0,0}, // 8
-  	{0,0,0,0,1,0,0}  // 9
-    };
-    void display7SEG(int num) {
-      GPIO_TypeDef* ports[7] = {SEG0_GPIO_Port,SEG1_GPIO_Port,SEG2_GPIO_Port,
-                              SEG3_GPIO_Port,SEG4_GPIO_Port,SEG5_GPIO_Port,SEG6_GPIO_Port};
-      uint16_t pins[7] = {SEG0_Pin,SEG1_Pin,SEG2_Pin,SEG3_Pin,SEG4_Pin,SEG5_Pin,SEG6_Pin};
+uint32_t segmentMap[10][7] = {
+	// a,b,c,d,e,f,g
+	{0,0,0,0,0,0,1}, // 0
+	{1,0,0,1,1,1,1}, // 1
+	{0,0,1,0,0,1,0}, // 2
+	{0,0,0,0,1,1,0}, // 3
+	{1,0,0,1,1,0,0}, // 4
+	{0,1,0,0,1,0,0}, // 5
+	{0,1,0,0,0,0,0}, // 6
+	{0,0,0,1,1,1,1}, // 7
+	{0,0,0,0,0,0,0}, // 8
+	{0,0,0,0,1,0,0}  // 9
+};
 
-      if (num < 0 || num > 9) return;
-      for (int i=0; i<7; i++) {
-        HAL_GPIO_WritePin(ports[i], pins[i], segmentMap[num][i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
-      }
+void display7SEG(int num) {
+  GPIO_TypeDef* ports[7] = {SEG0_GPIO_Port,SEG1_GPIO_Port,SEG2_GPIO_Port,
+                          SEG3_GPIO_Port,SEG4_GPIO_Port,SEG5_GPIO_Port,SEG6_GPIO_Port};
+  uint16_t pins[7] = {SEG0_Pin,SEG1_Pin,SEG2_Pin,SEG3_Pin,SEG4_Pin,SEG5_Pin,SEG6_Pin};
+
+  if (num < 0 || num > 9) return;
+  for (int i=0; i<7; i++) {
+    HAL_GPIO_WritePin(ports[i], pins[i], segmentMap[num][i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  }
+}
+
+void updateDisplay(DisplayState state) {
+  // Tắt tất cả EN trước
+  LED_OFF(EN0_GPIO_Port, EN0_Pin);
+  LED_OFF(EN1_GPIO_Port, EN1_Pin);
+  LED_OFF(EN2_GPIO_Port, EN2_Pin);
+  LED_OFF(EN3_GPIO_Port, EN3_Pin);
+
+  // Mặc định DOT và LED đỏ tắt
+  LED_OFF(DOT_GPIO_Port, DOT_Pin);
+  LED_OFF(LED_RED_GPIO_Port, LED_RED_Pin);
+
+  switch(state) {
+    case STATE_0:
+      LED_ON(EN0_GPIO_Port, EN0_Pin);
+      LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
+      LED_ON(DOT_GPIO_Port, DOT_Pin);
+      display7SEG(1);
+      break;
+
+    case STATE_1:
+      LED_ON(EN1_GPIO_Port, EN1_Pin);
+      LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
+      LED_ON(DOT_GPIO_Port, DOT_Pin);
+      display7SEG(2);
+      break;
+
+    case STATE_2:
+      LED_ON(EN2_GPIO_Port, EN2_Pin);
+      display7SEG(3);
+      break;
+
+    case STATE_3:
+      LED_ON(EN3_GPIO_Port, EN3_Pin);
+      LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
+      LED_ON(DOT_GPIO_Port, DOT_Pin);
+      display7SEG(0);
+      break;
     }
+}
 /* USER CODE END 0 */
 
 /**
@@ -123,7 +168,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  //exxxxxxxxxxxxx22222222222
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -185,7 +230,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 7999;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 9;
+  htim2.Init.Period = 1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -223,14 +268,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_RED_Pin|EN0_Pin|EN1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, DOT_Pin|LED_RED_Pin|EN0_Pin|EN1_Pin
+                          |EN2_Pin|EN3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, SEG0_Pin|SEG1_Pin|SEG2_Pin|SEG3_Pin
                           |SEG4_Pin|SEG5_Pin|SEG6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_RED_Pin EN0_Pin EN1_Pin */
-  GPIO_InitStruct.Pin = LED_RED_Pin|EN0_Pin|EN1_Pin;
+  /*Configure GPIO pins : DOT_Pin LED_RED_Pin EN0_Pin EN1_Pin
+                           EN2_Pin EN3_Pin */
+  GPIO_InitStruct.Pin = DOT_Pin|LED_RED_Pin|EN0_Pin|EN1_Pin
+                          |EN2_Pin|EN3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -249,24 +297,17 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  counter--;
-  if (counter <= 0) {
-    counter = 50;
-    if (currLed == 0) {
-      LED_ON(EN0_GPIO_Port, EN0_Pin);
-      LED_OFF(EN1_GPIO_Port, EN1_Pin);
-      LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
-      display7SEG(1);
-      currLed = 1;
+  static int tick = 0;
+    static DisplayState currentState = STATE_0;
+
+    tick++;
+
+    // Mỗi 500 tick đổi trạng thái
+    if (tick % 500 == 0) {
+        currentState = (currentState + 1) % 4;
     }
-    else {
-      LED_OFF(EN0_GPIO_Port, EN0_Pin);
-      LED_ON(EN1_GPIO_Port, EN1_Pin);
-      LED_OFF(LED_RED_GPIO_Port, LED_RED_Pin);
-      display7SEG(2);
-      currLed = 0;
-    }
-  }
+
+    updateDisplay(currentState);
 }
 /* USER CODE END 4 */
 
