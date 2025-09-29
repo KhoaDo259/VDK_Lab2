@@ -54,12 +54,17 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void display7SEG(int num);
 void update7SEG(int index);
+void updateClockBuffer();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int counter_1s = 0;  	 // đếm thời gian 1 giây
-int scan_counter = 0;    // đếm số lần ngắt cho quét LED
+int scan_counter = 0;
+int dot_counter = 0;
+int hour = 4, minute = 20, second = 50;
+const int MAX_LED = 4;
+int index_led = 0;
+int led_buffer[4] = {0, 4, 2, 0}; 			// khởi tạo ban đầu
 
 
 uint32_t segmentMap[10][7] = {
@@ -86,9 +91,6 @@ void display7SEG(int num) {
   }
 }
 
-const int MAX_LED = 4;
-int index_led = 0;
-int led_buffer[4] = {2, 0, 2, 5};
 void update7SEG(int index){
   LED_OFF(EN0_GPIO_Port, EN0_Pin);
   LED_OFF(EN1_GPIO_Port, EN1_Pin);
@@ -119,6 +121,13 @@ void update7SEG(int index){
     default:
       break;
   }
+}
+
+void updateClockBuffer() {
+    led_buffer[0] = hour / 10;     // hàng chục giờ
+    led_buffer[1] = hour % 10;     // hàng đơn vị giờ
+    led_buffer[2] = minute / 10;   // hàng chục phút
+    led_buffer[3] = minute % 10;   // hàng đơn vị phút
 }
 /* USER CODE END 0 */
 
@@ -159,6 +168,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  second++;
+	  if (second >= 60) {
+		  second = 0;
+		  minute++;
+	  }
+	  if (minute >= 60) {
+		  minute = 0;
+		  hour++;
+	  }
+	  if (hour >= 24) {
+		  hour = 0;
+	  }
+	  updateClockBuffer();   // cập nhật dữ liệu vào led_buffer
+	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -289,9 +312,9 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == TIM2) {   // chỉ xử lý khi ngắt từ TIM2
+	if (htim->Instance == TIM2) {
 		scan_counter++;
-		counter_1s++;
+		dot_counter++;
 		// Quét LED mỗi 250ms
 		if (scan_counter >= 25) {   // 25 x 10ms = 250ms
 			scan_counter = 0;
@@ -299,30 +322,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			index_led++;
 			if (index_led >= MAX_LED) index_led = 0;
 		}
-		// Đếm 1 giây
-		if (counter_1s >= 100) {  // 100 x 10ms = 1000ms
-			  counter_1s = 0;
-			  HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
-
-			  // đổi giá trị led_buffer sau mỗi giây
-			  // ví dụ: nhảy số tăng dần
-			  led_buffer[3]++;
-			  if (led_buffer[3] > 9) {
-				  led_buffer[3] = 0;
-				  led_buffer[2]++;
-			  }
-			  if (led_buffer[2] > 9) {
-				  led_buffer[2] = 0;
-				  led_buffer[1]++;
-			  }
-			  if (led_buffer[1] > 9) {
-				  led_buffer[1] = 0;
-				  led_buffer[0]++;
-			  }
-			  if (led_buffer[0] > 9) {
-				  led_buffer[0] = 0;
-			  }
-		  }
+		// Blink DOT mỗi 1000ms
+		if (dot_counter >= 100) {   // 100 x 10ms = 1000ms
+			dot_counter = 0;
+			HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
+		}
 	}
 }
 /* USER CODE END 4 */
