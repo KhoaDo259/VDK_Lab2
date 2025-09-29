@@ -53,37 +53,73 @@ static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void display7SEG(int num);
+void update7SEG(int index);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int led_index = 0;        // quét LED
-int dot_counter = 0;      // đếm để blink DOT
-int dot_state = 0;        // trạng thái DOT (bật/tắt)
+int counter_1s = 0;  // đếm thời gian 1 giây
+int scan_divider = 0;   // đếm số lần ngắt
+int scan_threshold = 50; // số ngắt trước khi đổi digit (50 x 10ms = 500ms)
 
-  uint32_t segmentMap[10][7] = {
-  	// a,b,c,d,e,f,g
-  	{0,0,0,0,0,0,1}, // 0
-  	{1,0,0,1,1,1,1}, // 1
-  	{0,0,1,0,0,1,0}, // 2
-  	{0,0,0,0,1,1,0}, // 3
-  	{1,0,0,1,1,0,0}, // 4
-  	{0,1,0,0,1,0,0}, // 5
-  	{0,1,0,0,0,0,0}, // 6
-  	{0,0,0,1,1,1,1}, // 7
-  	{0,0,0,0,0,0,0}, // 8
-  	{0,0,0,0,1,0,0}  // 9
-    };
-    void display7SEG(int num) {
-      GPIO_TypeDef* ports[7] = {SEG0_GPIO_Port,SEG1_GPIO_Port,SEG2_GPIO_Port,
-                              SEG3_GPIO_Port,SEG4_GPIO_Port,SEG5_GPIO_Port,SEG6_GPIO_Port};
-      uint16_t pins[7] = {SEG0_Pin,SEG1_Pin,SEG2_Pin,SEG3_Pin,SEG4_Pin,SEG5_Pin,SEG6_Pin};
+uint32_t segmentMap[10][7] = {
+	// a,b,c,d,e,f,g
+	{0,0,0,0,0,0,1}, // 0
+	{1,0,0,1,1,1,1}, // 1
+	{0,0,1,0,0,1,0}, // 2
+	{0,0,0,0,1,1,0}, // 3
+	{1,0,0,1,1,0,0}, // 4
+	{0,1,0,0,1,0,0}, // 5
+	{0,1,0,0,0,0,0}, // 6
+	{0,0,0,1,1,1,1}, // 7
+	{0,0,0,0,0,0,0}, // 8
+	{0,0,0,0,1,0,0}  // 9
+};
+void display7SEG(int num) {
+  GPIO_TypeDef* ports[7] = {SEG0_GPIO_Port,SEG1_GPIO_Port,SEG2_GPIO_Port,
+                          SEG3_GPIO_Port,SEG4_GPIO_Port,SEG5_GPIO_Port,SEG6_GPIO_Port};
+  uint16_t pins[7] = {SEG0_Pin,SEG1_Pin,SEG2_Pin,SEG3_Pin,SEG4_Pin,SEG5_Pin,SEG6_Pin};
 
-      if (num < 0 || num > 9) return;
-      for (int i=0; i<7; i++) {
-        HAL_GPIO_WritePin(ports[i], pins[i], segmentMap[num][i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
-      }
-    }
+  if (num < 0 || num > 9) return;
+  for (int i=0; i<7; i++) {
+    HAL_GPIO_WritePin(ports[i], pins[i], segmentMap[num][i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  }
+}
+
+const int MAX_LED = 4;
+int index_led = 0;
+int led_buffer[4] = {2, 0, 2, 5};
+void update7SEG(int index){
+  LED_OFF(EN0_GPIO_Port, EN0_Pin);
+  LED_OFF(EN1_GPIO_Port, EN1_Pin);
+  LED_OFF(EN2_GPIO_Port, EN2_Pin);
+  LED_OFF(EN3_GPIO_Port, EN3_Pin);
+
+  switch (index){
+    case 0:
+      //Display the first 7SEG with led_buffer[0]
+      LED_ON(EN0_GPIO_Port, EN0_Pin);
+      display7SEG(led_buffer[0]);
+      break;
+    case 1:
+      //Display the second 7SEG with led_buffer[1]
+      LED_ON(EN1_GPIO_Port, EN1_Pin);
+      display7SEG(led_buffer[1]);
+      break;
+    case 2:
+      //Display the third 7SEG with led_buffer[2]
+      LED_ON(EN2_GPIO_Port, EN2_Pin);
+      display7SEG(led_buffer[2]);
+      break;
+    case 3:
+      //Display the forth 7SEG with led_buffer[3]
+      LED_ON(EN3_GPIO_Port, EN3_Pin);
+      display7SEG(led_buffer[3]);
+      break;
+    default:
+      break;
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -253,57 +289,37 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == TIM2) {
-		// Mỗi lần callback = 10ms (theo prescaler=7999, ARR=9)
-		static int scan_counter = 0;
-		scan_counter += 10; // cộng 10ms
-
-		// Sau 500ms thì đổi LED quét
-		if (scan_counter >= 500) {
-			scan_counter = 0;
-
-			// Tắt tất cả EN trước khi đổi
-			LED_OFF(EN0_GPIO_Port, EN0_Pin);
-			LED_OFF(EN1_GPIO_Port, EN1_Pin);
-			LED_OFF(EN2_GPIO_Port, EN2_Pin);
-			LED_OFF(EN3_GPIO_Port, EN3_Pin);
-
-			// Chỉ dùng LED số 2 và 3 (tính từ 0)
-			switch (led_index) {
-				case 0: // LED thứ 3 hiển thị số 3
-					display7SEG(1);
-					LED_ON(EN0_GPIO_Port, EN0_Pin);
-					break;
-				case 1: // LED thứ 3 hiển thị số 3
-					display7SEG(2);
-					LED_ON(EN1_GPIO_Port, EN1_Pin);
-					break;
-				case 2: // LED thứ 3 hiển thị số 3
-					display7SEG(3);
-					LED_ON(EN2_GPIO_Port, EN2_Pin);
-					break;
-				case 3: // LED thứ 4 hiển thị số 0
-					display7SEG(0);
-					LED_ON(EN3_GPIO_Port, EN3_Pin);
-					break;
-				default:
-					break;
-			}
-
-			led_index++;
-			if (led_index > 3) led_index = 0; // chỉ quét LED 2 và 3
+	if (htim->Instance == TIM2) {   // chỉ xử lý khi ngắt từ TIM2
+		scan_divider++;
+		if (scan_divider >= scan_threshold) {
+			scan_divider = 0;
+			update7SEG(index_led);
+			index_led++;
+			if (index_led >= MAX_LED) index_led = 0;
 		}
+			// Đếm 1 giây
+	      counter_1s++;
+		  if (counter_1s >= 500) {  // 500 x 10ms = 5000ms
+			  counter_1s = 0;
 
-		// Blink DOT mỗi 1000ms
-		dot_counter += 10;
-		if (dot_counter >= 1000) {
-			dot_counter = 0;
-			dot_state = !dot_state;
-			if (dot_state) {
-				LED_ON(DOT_GPIO_Port, DOT_Pin);
-			} else {
-				LED_OFF(DOT_GPIO_Port, DOT_Pin);
-			}
+			  // đổi giá trị led_buffer sau mỗi giây
+			  // ví dụ: nhảy số tăng dần
+			  led_buffer[3]++;
+			  if (led_buffer[3] > 9) {
+				  led_buffer[3] = 0;
+				  led_buffer[2]++;
+			  }
+			  if (led_buffer[2] > 9) {
+				  led_buffer[2] = 0;
+				  led_buffer[1]++;
+			  }
+			  if (led_buffer[1] > 9) {
+				  led_buffer[1] = 0;
+				  led_buffer[0]++;
+			  }
+			  if (led_buffer[0] > 9) {
+				  led_buffer[0] = 0;
+			  }
 		}
 	}
 }
