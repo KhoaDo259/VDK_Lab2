@@ -203,6 +203,15 @@ int main(void)
 			  hour = 0;
 		  }
 		  updateClockBuffer();   // cập nhật dữ liệu vào led_buffer
+
+		  if (second % 2 == 0) {
+			  LED_ON(DOT_GPIO_Port, DOT_Pin); // DOT sáng
+		  	  LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
+		  }
+		  else {
+			  LED_OFF(DOT_GPIO_Port, DOT_Pin);   // DOT tắt
+		  	  LED_OFF(LED_RED_GPIO_Port, LED_RED_Pin);
+		  }
 	  }
     /* USER CODE END WHILE */
 
@@ -337,13 +346,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM2) {
 		timer_run(); // software timer chạy mỗi 10ms
 		counter++;
-		update7SEG(index_led);
-		index_led++;
-		if (index_led >= MAX_LED) index_led = 0;
-		if (counter >= 100) {
+		if (counter >= 20) {
 			counter = 0;
-			HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
-			HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+			update7SEG(index_led);
+			index_led++;
+			if (index_led >= MAX_LED) index_led = 0;
 		}
 	}
 }
