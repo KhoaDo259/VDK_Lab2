@@ -201,7 +201,7 @@ int main(void)
 
   while (1)
   {
-	  if (timer0_flag == 1) {
+	 if (timer0_flag == 1) {
 		  timer0_flag = 0;
 		  setTimer0(1000);
 

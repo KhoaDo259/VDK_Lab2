@@ -493,7 +493,7 @@ int main(void)
 
   while (1)
   {
-	  if (timer0_flag == 1) {
+	 if (timer0_flag == 1) {
  80003fc:	4b2a      	ldr	r3, [pc, #168]	; (80004a8 <main+0xd8>)
  80003fe:	681b      	ldr	r3, [r3, #0]
  8000400:	2b01      	cmp	r3, #1
@@ -595,7 +595,7 @@ int main(void)
  800049c:	1a9b      	subs	r3, r3, r2
  800049e:	4a08      	ldr	r2, [pc, #32]	; (80004c0 <main+0xf0>)
  80004a0:	6013      	str	r3, [r2, #0]
-	  if (timer0_flag == 1) {
+	 if (timer0_flag == 1) {
  80004a2:	e7ab      	b.n	80003fc <main+0x2c>
  80004a4:	20000170 	.word	0x20000170
  80004a8:	2000015c 	.word	0x2000015c
