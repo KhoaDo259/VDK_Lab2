@@ -55,13 +55,17 @@ static void MX_TIM2_Init(void);
 void display7SEG(int num);
 void update7SEG(int index);
 void updateClockBuffer();
+void setTimer0(int duration);
+void setTimer1(int duration);
+void timer_run();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int counter = 0;
-int timer0_counter = 0;
-int timer0_flag = 0;
+volatile int timer0_counter = 0;
+volatile int timer0_flag = 0;
+volatile int timer1_counter = 0;
+volatile int timer1_flag = 0;
 const int TIMER_CYCLE = 10; 					// vì TIM2 interrupt đang set 10ms
 
 int hour = 3, minute = 0, second = 56;
@@ -74,12 +78,22 @@ void setTimer0(int duration){
     timer0_flag = 0;
 }
 
+void setTimer1(int duration){
+    timer1_counter = duration / TIMER_CYCLE;
+    timer1_flag = 0;
+}
+
 void timer_run(){
+    // timer0: 1s (đồng hồ)
     if (timer0_counter > 0){
         timer0_counter--;
-        if (timer0_counter <= 0){
-            timer0_flag = 1; 					// báo hết hạn
-        }
+        if (timer0_counter == 0) timer0_flag = 1;
+    }
+
+    // timer1: quét 7-seg (ví dụ 20ms hoặc 50 * 10ms = 500ms tùy bạn)
+    if (timer1_counter > 0){
+        timer1_counter--;
+        if (timer1_counter == 0) timer1_flag = 1;
     }
 }
 
@@ -108,31 +122,30 @@ void display7SEG(int num) {
 }
 
 void update7SEG(int index){
+	if (index < 0 || index >= MAX_LED) return;
+
   LED_OFF(EN0_GPIO_Port, EN0_Pin);
   LED_OFF(EN1_GPIO_Port, EN1_Pin);
   LED_OFF(EN2_GPIO_Port, EN2_Pin);
   LED_OFF(EN3_GPIO_Port, EN3_Pin);
 
+  display7SEG(led_buffer[index]);
   switch (index){
     case 0:
       //Display the first 7SEG with led_buffer[0]
       LED_ON(EN0_GPIO_Port, EN0_Pin);
-      display7SEG(led_buffer[0]);
       break;
     case 1:
       //Display the second 7SEG with led_buffer[1]
       LED_ON(EN1_GPIO_Port, EN1_Pin);
-      display7SEG(led_buffer[1]);
       break;
     case 2:
       //Display the third 7SEG with led_buffer[2]
       LED_ON(EN2_GPIO_Port, EN2_Pin);
-      display7SEG(led_buffer[2]);
       break;
     case 3:
       //Display the forth 7SEG with led_buffer[3]
       LED_ON(EN3_GPIO_Port, EN3_Pin);
-      display7SEG(led_buffer[3]);
       break;
     default:
       break;
@@ -178,11 +191,13 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
+	updateClockBuffer();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   setTimer0(1000); // bắt đầu đếm 1 giây
+  setTimer1(50);
 
   while (1)
   {
@@ -204,14 +219,16 @@ int main(void)
 		  }
 		  updateClockBuffer();   // cập nhật dữ liệu vào led_buffer
 
-		  if (second % 2 == 0) {
-			  LED_ON(DOT_GPIO_Port, DOT_Pin); // DOT sáng
-		  	  LED_ON(LED_RED_GPIO_Port, LED_RED_Pin);
-		  }
-		  else {
-			  LED_OFF(DOT_GPIO_Port, DOT_Pin);   // DOT tắt
-		  	  LED_OFF(LED_RED_GPIO_Port, LED_RED_Pin);
-		  }
+		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4); // led DOT
+		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // led PA5
+	  }
+
+	  // Quét LED: mỗi 20ms
+	  if (timer1_flag == 1) {
+		  timer1_flag = 0;
+		  setTimer1(50);
+		  update7SEG(index_led);
+		  index_led = (index_led + 1) % MAX_LED;
 	  }
     /* USER CODE END WHILE */
 
@@ -344,14 +361,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM2) {
-		timer_run(); // software timer chạy mỗi 10ms
-		counter++;
-		if (counter >= 20) {
-			counter = 0;
-			update7SEG(index_led);
-			index_led++;
-			if (index_led >= MAX_LED) index_led = 0;
-		}
+		timer_run(); 						// software timer chạy mỗi 10ms
 	}
 }
 /* USER CODE END 4 */
