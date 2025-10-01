@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+  ****************************************************************************
   * @file           : main.c
   * @brief          : Main program body
-  ******************************************************************************
+  ****************************************************************************
   * @attention
   *
   * <h2><center>&copy; Copyright (c) 2025 STMicroelectronics.
@@ -14,7 +14,7 @@
   * License. You may obtain a copy of the License at:
   *                        opensource.org/licenses/BSD-3-Clause
   *
-  ******************************************************************************
+  ****************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -32,6 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAX_LED_MATRIX 8
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,7 +45,29 @@
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
+volatile int timer0_counter = 0, timer0_flag = 0;   // clock update
+volatile int timer1_counter = 0, timer1_flag = 0;   // 7SEG
+volatile int timer2_counter = 0, timer2_flag = 0;   // LED Matrix
+const int TIMER_CYCLE = 10;                         // 10ms interrupt
 
+int hour = 3, minute = 0, second = 56;
+const int MAX_LED = 4;
+int index_led = 0;
+int led_buffer[4] = {0, 0, 0, 0};
+
+/* LED MATRIX */
+int index_led_matrix = 0;
+// Ký tự "A"
+uint8_t matrix_buffer[8] = {
+    0b00011000,  //    **
+    0b00100100,  //   *  *
+    0b01000010,  //  *    *
+    0b01000010,  //  *    *
+    0b01111110,  //  **
+    0b01000010,  //  *    *
+    0b01000010,  //  *    *
+    0b00000000   //
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,43 +80,37 @@ void update7SEG(int index);
 void updateClockBuffer();
 void setTimer0(int duration);
 void setTimer1(int duration);
+void setTimer2(int duration);
 void timer_run();
+void updateLEDMatrix(int index);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-volatile int timer0_counter = 0;
-volatile int timer0_flag = 0;
-volatile int timer1_counter = 0;
-volatile int timer1_flag = 0;
-const int TIMER_CYCLE = 10; 					// vì TIM2 interrupt đang set 10ms
-
-int hour = 3, minute = 0, second = 56;
-const int MAX_LED = 4;
-int index_led = 0;
-int led_buffer[4] = {0, 4, 2, 0}; 				// khởi tạo ban đầu
-
 void setTimer0(int duration){
-    timer0_counter = duration / TIMER_CYCLE; 	// đổi ms thành số lần ngắt
+    timer0_counter = duration / TIMER_CYCLE;
     timer0_flag = 0;
 }
-
 void setTimer1(int duration){
     timer1_counter = duration / TIMER_CYCLE;
     timer1_flag = 0;
 }
-
+void setTimer2(int duration){
+    timer2_counter = duration / TIMER_CYCLE;
+    timer2_flag = 0;
+}
 void timer_run(){
-    // timer0: 1s (đồng hồ)
     if (timer0_counter > 0){
         timer0_counter--;
         if (timer0_counter == 0) timer0_flag = 1;
     }
-
-    // timer1: quét 7-seg (ví dụ 20ms hoặc 50 * 10ms = 500ms tùy bạn)
     if (timer1_counter > 0){
         timer1_counter--;
         if (timer1_counter == 0) timer1_flag = 1;
+    }
+    if (timer2_counter > 0){
+        timer2_counter--;
+        if (timer2_counter == 0) timer2_flag = 1;
     }
 }
 
@@ -153,11 +170,51 @@ void update7SEG(int index){
 }
 
 void updateClockBuffer() {
-    led_buffer[0] = hour / 10;     // hàng chục giờ
-    led_buffer[1] = hour % 10;     // hàng đơn vị giờ
+    led_buffer[0] = hour / 10;     // hàng chục gi�?
+    led_buffer[1] = hour % 10;     // hàng đơn vị gi�?
     led_buffer[2] = minute / 10;   // hàng chục phút
     led_buffer[3] = minute % 10;   // hàng đơn vị phút
 }
+
+// Tắt tất cả cột
+void disableAllColumns() {
+    HAL_GPIO_WritePin(GPIOA, ENM0_Pin|ENM1_Pin|ENM2_Pin|ENM3_Pin|ENM4_Pin|ENM5_Pin
+            |ENM6_Pin|ENM7_Pin, GPIO_PIN_SET);
+}
+
+// Bật đúng 1 cột
+void enableColumn(int index) {
+    switch(index){
+        case 0: HAL_GPIO_WritePin(GPIOA, ENM0_Pin, GPIO_PIN_RESET); break;
+        case 1: HAL_GPIO_WritePin(GPIOA, ENM1_Pin, GPIO_PIN_RESET); break;
+        case 2: HAL_GPIO_WritePin(GPIOA, ENM2_Pin, GPIO_PIN_RESET); break;
+        case 3: HAL_GPIO_WritePin(GPIOA, ENM3_Pin, GPIO_PIN_RESET); break;
+        case 4: HAL_GPIO_WritePin(GPIOA, ENM4_Pin, GPIO_PIN_RESET); break;
+        case 5: HAL_GPIO_WritePin(GPIOA, ENM5_Pin, GPIO_PIN_RESET); break;
+        case 6: HAL_GPIO_WritePin(GPIOA, ENM6_Pin, GPIO_PIN_RESET); break;
+        case 7: HAL_GPIO_WritePin(GPIOA, ENM7_Pin, GPIO_PIN_RESET); break;
+        default: break;
+    }
+}
+
+// Xuất dữ liệu của một cột
+void setColumnData(int colIndex) {
+    for (int row = 0; row < MAX_LED_MATRIX; row++) {
+        int bit_val = (matrix_buffer[row] >> (7 - colIndex)) & 0x01;
+        if (bit_val)
+            HAL_GPIO_WritePin(GPIOB, (1 << (row+8)), GPIO_PIN_RESET); // LED sáng
+        else
+            HAL_GPIO_WritePin(GPIOB, (1 << (row+8)), GPIO_PIN_SET);   // LED tắt
+    }
+}
+
+// Hàm chính
+void updateLEDMatrix(int col) {
+    disableAllColumns();
+    setColumnData(col);
+    enableColumn(col);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -198,7 +255,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   setTimer0(1000); // bắt đầu đếm 1 giây
   setTimer1(50);
-
+  setTimer2(20);    // quét LED matrix 2ms
   while (1)
   {
 	 if (timer0_flag == 1) {
@@ -230,6 +287,15 @@ int main(void)
 		  update7SEG(index_led);
 		  index_led = (index_led + 1) % MAX_LED;
 	  }
+
+	  /* LED MATRIX */
+		if (timer2_flag == 1){
+			timer2_flag = 0;
+			setTimer2(20);
+			updateLEDMatrix(index_led_matrix);
+			index_led_matrix++;
+			if (index_led_matrix >= MAX_LED_MATRIX) index_led_matrix = 0;
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -331,26 +397,38 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, DOT_Pin|LED_RED_Pin|EN0_Pin|EN1_Pin
-                          |EN2_Pin|EN3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, ENM0_Pin|ENM1_Pin|DOT_Pin|LED_RED_Pin
+                          |EN0_Pin|EN1_Pin|EN2_Pin|EN3_Pin
+                          |ENM2_Pin|ENM3_Pin|ENM4_Pin|ENM5_Pin
+                          |ENM6_Pin|ENM7_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SEG0_Pin|SEG1_Pin|SEG2_Pin|SEG3_Pin
-                          |SEG4_Pin|SEG5_Pin|SEG6_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, SEG0_Pin|SEG1_Pin|SEG2_Pin|ROW2_Pin
+                          |ROW3_Pin|ROW4_Pin|ROW5_Pin|ROW6_Pin
+                          |ROW7_Pin|SEG3_Pin|SEG4_Pin|SEG5_Pin
+                          |SEG6_Pin|ROW0_Pin|ROW1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DOT_Pin LED_RED_Pin EN0_Pin EN1_Pin
-                           EN2_Pin EN3_Pin */
-  GPIO_InitStruct.Pin = DOT_Pin|LED_RED_Pin|EN0_Pin|EN1_Pin
-                          |EN2_Pin|EN3_Pin;
+  /*Configure GPIO pins : ENM0_Pin ENM1_Pin DOT_Pin LED_RED_Pin
+                           EN0_Pin EN1_Pin EN2_Pin EN3_Pin
+                           ENM2_Pin ENM3_Pin ENM4_Pin ENM5_Pin
+                           ENM6_Pin ENM7_Pin */
+  GPIO_InitStruct.Pin = ENM0_Pin|ENM1_Pin|DOT_Pin|LED_RED_Pin
+                          |EN0_Pin|EN1_Pin|EN2_Pin|EN3_Pin
+                          |ENM2_Pin|ENM3_Pin|ENM4_Pin|ENM5_Pin
+                          |ENM6_Pin|ENM7_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SEG0_Pin SEG1_Pin SEG2_Pin SEG3_Pin
-                           SEG4_Pin SEG5_Pin SEG6_Pin */
-  GPIO_InitStruct.Pin = SEG0_Pin|SEG1_Pin|SEG2_Pin|SEG3_Pin
-                          |SEG4_Pin|SEG5_Pin|SEG6_Pin;
+  /*Configure GPIO pins : SEG0_Pin SEG1_Pin SEG2_Pin ROW2_Pin
+                           ROW3_Pin ROW4_Pin ROW5_Pin ROW6_Pin
+                           ROW7_Pin SEG3_Pin SEG4_Pin SEG5_Pin
+                           SEG6_Pin ROW0_Pin ROW1_Pin */
+  GPIO_InitStruct.Pin = SEG0_Pin|SEG1_Pin|SEG2_Pin|ROW2_Pin
+                          |ROW3_Pin|ROW4_Pin|ROW5_Pin|ROW6_Pin
+                          |ROW7_Pin|SEG3_Pin|SEG4_Pin|SEG5_Pin
+                          |SEG6_Pin|ROW0_Pin|ROW1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
