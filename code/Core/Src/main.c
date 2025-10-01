@@ -48,6 +48,7 @@ TIM_HandleTypeDef htim2;
 volatile int timer0_counter = 0, timer0_flag = 0;   // clock update
 volatile int timer1_counter = 0, timer1_flag = 0;   // 7SEG
 volatile int timer2_counter = 0, timer2_flag = 0;   // LED Matrix
+volatile int timer3_counter = 0, timer3_flag = 0;   // Animation
 const int TIMER_CYCLE = 10;                         // 10ms interrupt
 
 int hour = 3, minute = 0, second = 56;
@@ -63,7 +64,7 @@ uint8_t matrix_buffer[8] = {
     0b00100100,  //   *  *
     0b01000010,  //  *    *
     0b01000010,  //  *    *
-    0b01111110,  //  **
+    0b01111110,  //  *****
     0b01000010,  //  *    *
     0b01000010,  //  *    *
     0b00000000   //
@@ -81,8 +82,10 @@ void updateClockBuffer();
 void setTimer0(int duration);
 void setTimer1(int duration);
 void setTimer2(int duration);
+void setTimer3(int duration);
 void timer_run();
 void updateLEDMatrix(int index);
+void shiftLeft();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -99,6 +102,10 @@ void setTimer2(int duration){
     timer2_counter = duration / TIMER_CYCLE;
     timer2_flag = 0;
 }
+void setTimer3(int duration){
+    timer3_counter = duration / TIMER_CYCLE;
+    timer3_flag = 0;
+}
 void timer_run(){
     if (timer0_counter > 0){
         timer0_counter--;
@@ -111,6 +118,10 @@ void timer_run(){
     if (timer2_counter > 0){
         timer2_counter--;
         if (timer2_counter == 0) timer2_flag = 1;
+    }
+    if (timer3_counter > 0){
+        timer3_counter--;
+        if (timer3_counter == 0) timer3_flag = 1;
     }
 }
 
@@ -149,19 +160,15 @@ void update7SEG(int index){
   display7SEG(led_buffer[index]);
   switch (index){
     case 0:
-      //Display the first 7SEG with led_buffer[0]
       LED_ON(EN0_GPIO_Port, EN0_Pin);
       break;
     case 1:
-      //Display the second 7SEG with led_buffer[1]
       LED_ON(EN1_GPIO_Port, EN1_Pin);
       break;
     case 2:
-      //Display the third 7SEG with led_buffer[2]
       LED_ON(EN2_GPIO_Port, EN2_Pin);
       break;
     case 3:
-      //Display the forth 7SEG with led_buffer[3]
       LED_ON(EN3_GPIO_Port, EN3_Pin);
       break;
     default:
@@ -170,10 +177,10 @@ void update7SEG(int index){
 }
 
 void updateClockBuffer() {
-    led_buffer[0] = hour / 10;     // hàng chục gi�?
-    led_buffer[1] = hour % 10;     // hàng đơn vị gi�?
-    led_buffer[2] = minute / 10;   // hàng chục phút
-    led_buffer[3] = minute % 10;   // hàng đơn vị phút
+    led_buffer[0] = hour / 10;
+    led_buffer[1] = hour % 10;
+    led_buffer[2] = minute / 10;
+    led_buffer[3] = minute % 10;
 }
 
 // Tắt tất cả cột
@@ -215,6 +222,22 @@ void updateLEDMatrix(int col) {
     enableColumn(col);
 }
 
+// ====== Exercise 10: Animation ======
+void shiftLeft() {
+    for (int row = 0; row < MAX_LED_MATRIX; row++) {
+        uint8_t bit7 = (matrix_buffer[row] >> 7) & 0x01;   // lấy bit ngoài cùng bên trái
+        matrix_buffer[row] <<= 1;                          // dịch trái
+        matrix_buffer[row] |= bit7;                        // đưa lại bit vào bên phải (vòng tròn)
+    }
+}
+
+void shiftRight(uint8_t buffer[8]) {
+    for (int i = 0; i < 8; i++) {
+        uint8_t lastBit = buffer[i] & 0x01;   // lấy bit ngoài cùng bên phải
+        buffer[i] >>= 1;                      // dịch phải
+        if (lastBit) buffer[i] |= 0x80;       // nếu bit cũ là 1 thì thêm vào bên trái
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -256,6 +279,7 @@ int main(void)
   setTimer0(1000); // bắt đầu đếm 1 giây
   setTimer1(50);
   setTimer2(20);    // quét LED matrix 2ms
+  setTimer3(300);
   while (1)
   {
 	 if (timer0_flag == 1) {
@@ -296,6 +320,13 @@ int main(void)
 			index_led_matrix++;
 			if (index_led_matrix >= MAX_LED_MATRIX) index_led_matrix = 0;
 		}
+
+		// Animation cho LED matrix
+	  if (timer3_flag == 1){
+		  timer3_flag = 0;
+		  setTimer3(300);   // dịch trái mỗi 300ms
+		  shiftLeft();
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
