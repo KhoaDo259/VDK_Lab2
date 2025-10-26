@@ -37,38 +37,14 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define LED_ON(port, pin) HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET)
-#define LED_OFF(port, pin) HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET)
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-volatile int timer0_counter = 0, timer0_flag = 0;   // clock update
-volatile int timer1_counter = 0, timer1_flag = 0;   // 7SEG
-volatile int timer2_counter = 0, timer2_flag = 0;   // LED Matrix
-volatile int timer3_counter = 0, timer3_flag = 0;   // Animation
-const int TIMER_CYCLE = 10;                         // 10ms interrupt
-
-int hour = 3, minute = 0, second = 56;
-const int MAX_LED = 4;
-int index_led = 0;
-int led_buffer[4] = {0, 0, 0, 0};
-
-/* LED MATRIX */
-int index_led_matrix = 0;
-// Ký tự "A"
-uint8_t matrix_buffer[8] = {
-    0b00011000,  //    **
-    0b00100100,  //   *  *
-    0b01000010,  //  *    *
-    0b01000010,  //  *    *
-    0b01111110,  //  *****
-    0b01000010,  //  *    *
-    0b01000010,  //  *    *
-    0b00000000   //
-};
+int hour = 8, minute = 56, second = 10;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,168 +52,12 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-void display7SEG(int num);
-void update7SEG(int index);
-void updateClockBuffer();
-void setTimer0(int duration);
-void setTimer1(int duration);
-void setTimer2(int duration);
-void setTimer3(int duration);
-void timer_run();
-void updateLEDMatrix(int index);
-void shiftLeft();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void setTimer0(int duration){
-    timer0_counter = duration / TIMER_CYCLE;
-    timer0_flag = 0;
-}
-void setTimer1(int duration){
-    timer1_counter = duration / TIMER_CYCLE;
-    timer1_flag = 0;
-}
-void setTimer2(int duration){
-    timer2_counter = duration / TIMER_CYCLE;
-    timer2_flag = 0;
-}
-void setTimer3(int duration){
-    timer3_counter = duration / TIMER_CYCLE;
-    timer3_flag = 0;
-}
-void timer_run(){
-    if (timer0_counter > 0){
-        timer0_counter--;
-        if (timer0_counter == 0) timer0_flag = 1;
-    }
-    if (timer1_counter > 0){
-        timer1_counter--;
-        if (timer1_counter == 0) timer1_flag = 1;
-    }
-    if (timer2_counter > 0){
-        timer2_counter--;
-        if (timer2_counter == 0) timer2_flag = 1;
-    }
-    if (timer3_counter > 0){
-        timer3_counter--;
-        if (timer3_counter == 0) timer3_flag = 1;
-    }
-}
 
-uint32_t segmentMap[10][7] = {
-	// a,b,c,d,e,f,g
-	{0,0,0,0,0,0,1}, // 0
-	{1,0,0,1,1,1,1}, // 1
-	{0,0,1,0,0,1,0}, // 2
-	{0,0,0,0,1,1,0}, // 3
-	{1,0,0,1,1,0,0}, // 4
-	{0,1,0,0,1,0,0}, // 5
-	{0,1,0,0,0,0,0}, // 6
-	{0,0,0,1,1,1,1}, // 7
-	{0,0,0,0,0,0,0}, // 8
-	{0,0,0,0,1,0,0}  // 9
-};
-void display7SEG(int num) {
-  GPIO_TypeDef* ports[7] = {SEG0_GPIO_Port,SEG1_GPIO_Port,SEG2_GPIO_Port,
-                          SEG3_GPIO_Port,SEG4_GPIO_Port,SEG5_GPIO_Port,SEG6_GPIO_Port};
-  uint16_t pins[7] = {SEG0_Pin,SEG1_Pin,SEG2_Pin,SEG3_Pin,SEG4_Pin,SEG5_Pin,SEG6_Pin};
-
-  if (num < 0 || num > 9) return;
-  for (int i=0; i<7; i++) {
-    HAL_GPIO_WritePin(ports[i], pins[i], segmentMap[num][i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
-  }
-}
-
-void update7SEG(int index){
-	if (index < 0 || index >= MAX_LED) return;
-
-  LED_OFF(EN0_GPIO_Port, EN0_Pin);
-  LED_OFF(EN1_GPIO_Port, EN1_Pin);
-  LED_OFF(EN2_GPIO_Port, EN2_Pin);
-  LED_OFF(EN3_GPIO_Port, EN3_Pin);
-
-  display7SEG(led_buffer[index]);
-  switch (index){
-    case 0:
-      LED_ON(EN0_GPIO_Port, EN0_Pin);
-      break;
-    case 1:
-      LED_ON(EN1_GPIO_Port, EN1_Pin);
-      break;
-    case 2:
-      LED_ON(EN2_GPIO_Port, EN2_Pin);
-      break;
-    case 3:
-      LED_ON(EN3_GPIO_Port, EN3_Pin);
-      break;
-    default:
-      break;
-  }
-}
-
-void updateClockBuffer() {
-    led_buffer[0] = hour / 10;
-    led_buffer[1] = hour % 10;
-    led_buffer[2] = minute / 10;
-    led_buffer[3] = minute % 10;
-}
-
-// Tắt tất cả cột
-void disableAllColumns() {
-    HAL_GPIO_WritePin(GPIOA, ENM0_Pin|ENM1_Pin|ENM2_Pin|ENM3_Pin|ENM4_Pin|ENM5_Pin
-            |ENM6_Pin|ENM7_Pin, GPIO_PIN_SET);
-}
-
-// Bật đúng 1 cột
-void enableColumn(int index) {
-    switch(index){
-        case 0: HAL_GPIO_WritePin(GPIOA, ENM0_Pin, GPIO_PIN_RESET); break;
-        case 1: HAL_GPIO_WritePin(GPIOA, ENM1_Pin, GPIO_PIN_RESET); break;
-        case 2: HAL_GPIO_WritePin(GPIOA, ENM2_Pin, GPIO_PIN_RESET); break;
-        case 3: HAL_GPIO_WritePin(GPIOA, ENM3_Pin, GPIO_PIN_RESET); break;
-        case 4: HAL_GPIO_WritePin(GPIOA, ENM4_Pin, GPIO_PIN_RESET); break;
-        case 5: HAL_GPIO_WritePin(GPIOA, ENM5_Pin, GPIO_PIN_RESET); break;
-        case 6: HAL_GPIO_WritePin(GPIOA, ENM6_Pin, GPIO_PIN_RESET); break;
-        case 7: HAL_GPIO_WritePin(GPIOA, ENM7_Pin, GPIO_PIN_RESET); break;
-        default: break;
-    }
-}
-
-// Xuất dữ liệu của một cột
-void setColumnData(int colIndex) {
-    for (int row = 0; row < MAX_LED_MATRIX; row++) {
-        int bit_val = (matrix_buffer[row] >> (7 - colIndex)) & 0x01;
-        if (bit_val)
-            HAL_GPIO_WritePin(GPIOB, (1 << (row+8)), GPIO_PIN_RESET); // LED sáng
-        else
-            HAL_GPIO_WritePin(GPIOB, (1 << (row+8)), GPIO_PIN_SET);   // LED tắt
-    }
-}
-
-// Hàm chính
-void updateLEDMatrix(int col) {
-    disableAllColumns();
-    setColumnData(col);
-    enableColumn(col);
-}
-
-// ====== Exercise 10: Animation ======
-void shiftLeft() {
-    for (int row = 0; row < MAX_LED_MATRIX; row++) {
-        uint8_t bit7 = (matrix_buffer[row] >> 7) & 0x01;   // lấy bit ngoài cùng bên trái
-        matrix_buffer[row] <<= 1;                          // dịch trái
-        matrix_buffer[row] |= bit7;                        // đưa lại bit vào bên phải (vòng tròn)
-    }
-}
-
-void shiftRight(uint8_t buffer[8]) {
-    for (int i = 0; i < 8; i++) {
-        uint8_t lastBit = buffer[i] & 0x01;   // lấy bit ngoài cùng bên phải
-        buffer[i] >>= 1;                      // dịch phải
-        if (lastBit) buffer[i] |= 0x80;       // nếu bit cũ là 1 thì thêm vào bên trái
-    }
-}
 /* USER CODE END 0 */
 
 /**
@@ -271,20 +91,24 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
-	updateClockBuffer();
+
+  updateClockBuffer(hour, minute);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  setTimer0(1000); // bắt đầu đếm 1 giây
-  setTimer1(50);
-  setTimer2(20);    // quét LED matrix 2ms
-  setTimer3(300);
+  // Timer 0: Cập nhật đồng hồ (1000ms)
+  setTimer(0, 1000);
+  // Timer 1: Quét LED 7 đoạn (50ms)
+  setTimer(1, 50);
+  // Timer 2: Quét LED Matrix (20ms)
+  setTimer(2, 20);
+  // Timer 3: Animation (300ms)
+  setTimer(3, 300);
   while (1)
   {
-	 if (timer0_flag == 1) {
-		  timer0_flag = 0;
-		  setTimer0(1000);
+	 if (timer_flags[0] == 1) {
+		  setTimer(0, 1000);
 
 		  second++;
 		  if (second >= 60) {
@@ -298,33 +122,27 @@ int main(void)
 		  if (hour >= 24) {
 			  hour = 0;
 		  }
-		  updateClockBuffer();   // cập nhật dữ liệu vào led_buffer
+		  updateClockBuffer(hour, minute);   // cập nhật dữ liệu vào led_buffer
 
 		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4); // led DOT
 		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // led PA5
 	  }
 
-	  // Quét LED: mỗi 20ms
-	  if (timer1_flag == 1) {
-		  timer1_flag = 0;
-		  setTimer1(50);
-		  update7SEG(index_led);
-		  index_led = (index_led + 1) % MAX_LED;
+	  // Quét 7SEG
+	  if (timer_flags[1] == 1) {
+		  setTimer(1, 50);
+		  update7SEG();
 	  }
 
-	  /* LED MATRIX */
-		if (timer2_flag == 1){
-			timer2_flag = 0;
-			setTimer2(20);
-			updateLEDMatrix(index_led_matrix);
-			index_led_matrix++;
-			if (index_led_matrix >= MAX_LED_MATRIX) index_led_matrix = 0;
+	  // LED MATRIX
+		if (timer_flags[2] == 1){
+			setTimer(2, 50);
+			updateLEDMatrix();
 		}
 
 		// Animation cho LED matrix
-	  if (timer3_flag == 1){
-		  timer3_flag = 0;
-		  setTimer3(300);   // dịch trái mỗi 300ms
+	  if (timer_flags[3] == 1){
+		  setTimer(3, 300);   // dịch trái mỗi 300ms
 		  shiftLeft();
 	  }
     /* USER CODE END WHILE */

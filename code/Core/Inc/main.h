@@ -32,7 +32,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "software_timer.h"
+#include "display_7seg.h"
+#include "led_matrix.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

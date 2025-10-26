@@ -1,0 +1,6 @@
+led_matrix.c:29:13:disableAllColumns	8	static
+led_matrix.c:35:13:enableColumn	16	static
+led_matrix.c:49:13:setColumnData	48	static
+led_matrix.c:71:6:updateLEDMatrix	8	static
+led_matrix.c:83:6:shiftLeft	16	static
+led_matrix.c:91:6:shiftRight	16	static
